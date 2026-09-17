@@ -1,0 +1,13 @@
+# 실행 데이터 (업체·입찰 정보)
+data.json
+scenarios.json
+현업통합테스트.json
+
+# 백업
+*.bak
+
+node_modules/
+
+# 실제 업체 데이터가 담긴 캡처 이미지
+샘플.PNG
+설계도.PNG

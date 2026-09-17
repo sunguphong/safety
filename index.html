@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>안전보건 입찰 평가</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>안전보건 입찰 평가표</h1>
+    <p class="subtitle">업체별 D-Safe점수와 입찰금액을 입력하면 나머지 항목이 자동 계산됩니다.</p>
+  </header>
+
+  <div class="toolbar">
+    <button id="add-row-btn" class="btn btn-primary">+ 업체 추가</button>
+    <button id="save-scenario-btn" class="btn btn-save">💾 현재 상태 저장</button>
+    <span id="sample-buttons"></span>
+    <span id="sync-status" class="sync-status"></span>
+  </div>
+
+  <div class="table-wrap">
+    <table id="eval-table">
+      <thead>
+        <tr>
+          <th>참여업체</th>
+          <th>업체명</th>
+          <th>업체수준</th>
+          <th>D-Safe점수</th>
+          <th>환산</th>
+          <th>안전Hurdle<br>(가감점)</th>
+          <th>소계</th>
+          <th>입찰금액</th>
+          <th>가격점수</th>
+          <th>안전보건점수</th>
+          <th>종합평가결과</th>
+          <th>입찰순위</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="eval-body"></tbody>
+    </table>
+  </div>
+
+  <section class="rules">
+    <h2>계산 기준</h2>
+    <ul>
+      <li><b>입력받는 값</b> : 업체별 D-Safe점수, 입찰금액 (입찰금액이 비어 있으면 <b>미참여</b> 처리)</li>
+      <li>D-Safe점수 입력이 없는 참여업체는 <b>업체수준</b>에 따라 자동 계산
+        <ul>
+          <li>업체수준 <b>상</b> : 입력된 D-Safe점수 중 <b>최고점</b></li>
+          <li>업체수준 <b>중</b> : 입력된 D-Safe점수들의 <b>평균점</b></li>
+          <li>업체수준 <b>하</b> : 입력된 D-Safe점수들의 <b>최하점</b></li>
+          <li>단, 입찰 <b>미참여</b> 업체의 D-Safe점수는 자동 계산 시 제외</li>
+        </ul>
+      </li>
+      <li><b>환산</b> = 20 × ( D-Safe점수 ÷ 100 )</li>
+      <li><b>소계</b> = 환산 + 안전Hurdle(가감점)</li>
+      <li><b>가격점수</b> = 80 × 최저 입찰액 ÷ 해당업체 입찰액</li>
+      <li><b>안전보건점수</b> = 20 × ( D-Safe점수 ÷ 100 ) + 안전Hurdle점수</li>
+      <li><b>종합평가결과</b> = 가격점수 + 안전보건점수 → 높은 순으로 <b>입찰순위</b> 부여</li>
+    </ul>
+  </section>
+
+  <footer class="conn-info">
+    <h2>접속 정보</h2>
+    <p>내 IP : <b id="my-ip">-</b></p>
+    <p>현재 접속자 (<span id="client-count">0</span>명) : <span id="client-list">-</span></p>
+  </footer>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
