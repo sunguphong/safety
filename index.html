@@ -6,7 +6,16 @@
 <title>안전보건 입찰 평가</title>
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="locked">
+<div id="login-gate" hidden>
+  <form class="gate-box">
+    <h1>안전보건 입찰 평가표</h1>
+    <p class="sub">열람하려면 비밀번호를 입력하세요.</p>
+    <div class="msg"></div>
+    <input type="password" placeholder="비밀번호" autocomplete="current-password">
+    <button type="submit">들어가기</button>
+  </form>
+</div>
 <div class="container">
   <header>
     <h1>안전보건 입찰 평가표</h1>

@@ -9,6 +9,32 @@ body {
 
 .container { max-width: 1280px; margin: 0 auto; }
 
+/* 접속 비밀번호 (브라우저 저장 모드) — 확인 전에는 평가표를 숨김 */
+body.locked .container { display: none; }
+#login-gate[hidden] { display: none; }
+#login-gate {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: #f4f6f9;
+}
+.gate-box {
+  background: #fff; padding: 36px 32px; border-radius: 10px; width: 320px;
+  box-shadow: 0 2px 16px rgba(0,0,0,.09); text-align: center;
+}
+.gate-box h1 { font-size: 18px; margin-bottom: 6px; }
+.gate-box .sub { font-size: 13px; color: #666; margin-bottom: 22px; }
+.gate-box .msg { color: #c0392b; font-size: 13px; min-height: 18px; margin-bottom: 6px; }
+.gate-box input {
+  width: 100%; padding: 11px 12px; font-size: 15px;
+  border: 1px solid #ccd2d8; border-radius: 6px; margin-bottom: 12px;
+}
+.gate-box input:focus { outline: none; border-color: #2b6cb0; }
+.gate-box button {
+  width: 100%; padding: 11px; font-size: 15px; font-weight: 600; color: #fff;
+  background: #2b6cb0; border: 0; border-radius: 6px; cursor: pointer;
+}
+.gate-box button:hover { background: #245a94; }
+
 header { margin-bottom: 16px; }
 h1 { font-size: 24px; margin-bottom: 4px; }
 .subtitle { color: #666; font-size: 13px; }

@@ -299,6 +299,45 @@ async function pollClients() {
   } catch (e) { /* 다음 주기에 재시도 */ }
 }
 
+// ---------- 접속 비밀번호 (브라우저 저장 모드 전용) ----------
+// 서버 모드는 server.js 가 로그인을 처리합니다.
+// 정적 사이트(GitHub Pages)는 코드가 공개되므로 우회 가능한 간이 잠금입니다.
+// 비밀번호를 바꾸려면: node -e "console.log(require('crypto').createHash('sha256').update('새비밀번호').digest('hex'))"
+// 로 나온 값을 아래에 넣으세요.
+const PASSWORD_SHA256 = 'bf1ca3234f524b2da68fe417b6e52f7fb79162bb10f72ef35b60c7f09c12954d';
+const SS_UNLOCK = 'safety.unlocked';
+
+async function sha256Hex(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function requirePassword() {
+  try { if (sessionStorage.getItem(SS_UNLOCK) === PASSWORD_SHA256) return Promise.resolve(); } catch (e) { /* 저장소 사용 불가 */ }
+  if (!window.crypto || !crypto.subtle) return Promise.resolve();  // https 가 아니면 해시 계산 불가
+
+  const gate = document.getElementById('login-gate');
+  const form = gate.querySelector('form');
+  const input = gate.querySelector('input');
+  const msg = gate.querySelector('.msg');
+  gate.hidden = false;
+  input.focus();
+
+  return new Promise(resolve => {
+    form.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      if (await sha256Hex(input.value) === PASSWORD_SHA256) {
+        try { sessionStorage.setItem(SS_UNLOCK, PASSWORD_SHA256); } catch (e) { /* 저장소 사용 불가 */ }
+        gate.hidden = true;
+        resolve();
+      } else {
+        msg.textContent = '비밀번호가 올바르지 않습니다.';
+        input.select();
+      }
+    });
+  });
+}
+
 async function init() {
   try {
     const res = await fetch('/api/data');
@@ -321,6 +360,7 @@ async function init() {
   } catch (e) {
     // GitHub Pages / file:// 등 서버가 없는 경우: 브라우저 저장 모드
     online = false;
+    await requirePassword();
     const saved = lsGet(LS_DATA, null);
     if (saved && Array.isArray(saved.rows)) renderRows(saved.rows);
     else await loadSample(SAMPLES[0], false);
@@ -328,6 +368,7 @@ async function init() {
     await refreshScenarios();
     pollClients();
   }
+  document.body.classList.remove('locked');
 }
 
 document.getElementById('add-row-btn').addEventListener('click', () => {
