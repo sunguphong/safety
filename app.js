@@ -304,7 +304,7 @@ async function pollClients() {
 // 정적 사이트(GitHub Pages)는 코드가 공개되므로 우회 가능한 간이 잠금입니다.
 // 비밀번호를 바꾸려면: node -e "console.log(require('crypto').createHash('sha256').update('새비밀번호').digest('hex'))"
 // 로 나온 값을 아래에 넣으세요.
-const PASSWORD_SHA256 = 'bf1ca3234f524b2da68fe417b6e52f7fb79162bb10f72ef35b60c7f09c12954d';
+const PASSWORD_SHA256 = '0ffe1abd1a08215353c233d6e009613e95eec4253832a761af28ff37ac5a150c';
 const SS_UNLOCK = 'safety.unlocked';
 
 async function sha256Hex(text) {
