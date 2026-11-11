@@ -183,3 +183,57 @@ td.absent-label { color: #333; font-weight: 700; }
 .conn-info h2 { font-size: 16px; margin-bottom: 8px; }
 .conn-info b { color: #2b6cb0; }
 #client-list { color: #444; }
+
+/* ---------- 이미지에서 불러오기 (OCR) ---------- */
+.btn-ocr { color: #6b46c1; border-color: #c4b5ec; background: #f7f4ff; }
+.btn-ocr:hover { background: #ede7ff; }
+
+.modal[hidden] { display: none; }
+.modal {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.45); padding: 16px;
+}
+.modal-box {
+  background: #fff; border-radius: 10px; width: 100%; max-width: 980px;
+  max-height: calc(100vh - 32px); overflow: auto;
+  padding: 20px 22px; box-shadow: 0 6px 30px rgba(0,0,0,.25);
+}
+.modal-head { display: flex; align-items: center; margin-bottom: 6px; }
+.modal-head h2 { font-size: 18px; flex: 1; }
+.modal-close { border: 0; background: none; font-size: 18px; color: #888; cursor: pointer; padding: 2px 8px; }
+.modal-close:hover { color: #c00; }
+.modal-sub { font-size: 12px; color: #666; line-height: 1.6; margin-bottom: 12px; }
+
+.ocr-top { display: flex; gap: 14px; margin-bottom: 12px; flex-wrap: wrap; }
+#ocr-preview {
+  max-width: 100%; width: 520px; max-height: 240px; object-fit: contain;
+  border: 1px solid #ddd; border-radius: 6px; background: #fafafa;
+}
+.ocr-side { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.ocr-progress { font-size: 13px; color: #6b46c1; font-weight: 600; }
+.ocr-progress.error { color: #c53030; }
+.ocr-side details { font-size: 12px; width: 100%; }
+.ocr-side summary { cursor: pointer; color: #555; }
+#ocr-raw {
+  margin-top: 6px; max-height: 160px; overflow: auto; white-space: pre-wrap;
+  background: #f6f6f6; padding: 8px; border-radius: 4px; font-size: 11px;
+}
+
+.ocr-table-wrap { box-shadow: none; border: 1px solid #ddd; }
+.ocr-table { min-width: 720px; }
+.ocr-table td input.name-input { min-width: 140px; }
+.ocr-table td.empty { color: #999; padding: 18px; white-space: normal; }
+
+.modal-foot { display: flex; gap: 8px; margin-top: 14px; align-items: center; flex-wrap: wrap; }
+.modal-foot .spacer { flex: 1; }
+
+/* D-safe 자동계산점수 / 비고 */
+td.note-cell { min-width: 170px; text-align: left; }
+td.note-cell input.note-input { text-align: left; min-width: 120px; }
+.lowest-tag {
+  display: inline-block; margin-bottom: 2px;
+  font-size: 11px; font-weight: 700; color: #d40000;
+  background: #fff0f0; border: 1px solid #f3b4b4; border-radius: 10px; padding: 1px 8px;
+}
+.lowest-tag[hidden] { display: none; }

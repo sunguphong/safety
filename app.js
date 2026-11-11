@@ -75,11 +75,13 @@ function onEdited() {
   scheduleSave();
 }
 
+const escAttr = v => String(v ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
 function createRow(data = {}) {
   const tr = document.createElement('tr');
   tr.innerHTML = `
-    <td class="strike"><input class="code-input" value="${data.code || ''}" placeholder="코드"></td>
-    <td class="strike"><input class="name-input" value="${data.name || ''}" placeholder="업체명"></td>
+    <td class="strike"><input class="code-input" value="${escAttr(data.code)}" placeholder="코드"></td>
+    <td class="strike"><input class="name-input" value="${escAttr(data.name)}" placeholder="업체명"></td>
     <td>
       <select class="level-input">
         <option value=""></option>
@@ -88,15 +90,17 @@ function createRow(data = {}) {
         <option value="하">하</option>
       </select>
     </td>
-    <td class="strike"><input class="dsafe-input" type="number" step="0.1" min="0" max="100" value="${data.dsafe || ''}" placeholder="-"></td>
+    <td class="strike"><input class="dsafe-input" type="number" step="0.1" min="0" max="100" value="${escAttr(data.dsafe)}" placeholder="-"></td>
     <td class="calc conv-cell"></td>
-    <td><input class="hurdle-input" type="number" step="1" value="${data.hurdle || ''}" placeholder="0"></td>
+    <td><input class="hurdle-input" type="number" step="1" value="${escAttr(data.hurdle)}" placeholder="0"></td>
     <td class="calc subtotal-cell"></td>
-    <td class="bid-cell"><input class="bid-input" value="${data.bid ? Number(data.bid).toLocaleString() : ''}" placeholder="미참여"></td>
+    <td class="bid-cell"><input class="bid-input" value="${parseBid(data.bid) !== null ? parseBid(data.bid).toLocaleString() : ''}" placeholder="미참여"></td>
     <td class="calc price-cell"></td>
     <td class="calc safety-cell"></td>
     <td class="calc total-cell"></td>
     <td class="calc rank-cell"></td>
+    <td class="calc autodsafe-cell"></td>
+    <td class="note-cell"><span class="lowest-tag" hidden>최저가 업체</span><input class="note-input" value="${escAttr(data.note)}"></td>
     <td><button class="del-btn" title="행 삭제">✕</button></td>
   `;
   tr.querySelector('.level-input').value = data.level || '';
@@ -128,6 +132,7 @@ function getRowsData() {
       dsafe: tr.querySelector('.dsafe-input').value,
       hurdle: tr.querySelector('.hurdle-input').value,
       bid: bid !== null ? String(bid) : '',
+      note: tr.querySelector('.note-input').value,
     };
   });
 }
@@ -213,9 +218,12 @@ function recalc() {
     set('.safety-cell',   r.safety !== null ? fmt1(r.safety) : '', r.auto);
     set('.total-cell',    r.total  !== null ? fmt1(r.total)  : '');
     set('.rank-cell',     r.rank ?? '');
+    set('.autodsafe-cell', r.auto ? fmt1(r.dsafe) : '', r.auto);
 
     const bidTd = tr.querySelector('.bid-cell');
-    bidTd.classList.toggle('lowest-bid', !absent && r.bid === lowestBid && participants.length > 1);
+    const isLowest = !absent && r.bid === lowestBid && participants.length > 1;
+    bidTd.classList.toggle('lowest-bid', isLowest);
+    tr.querySelector('.lowest-tag').hidden = !isLowest;
     bidTd.classList.toggle('absent-label', absent);
     tr.querySelector('.bid-input').placeholder = '미참여';
 
@@ -532,5 +540,275 @@ async function saveScenario() {
 }
 
 document.getElementById('save-scenario-btn').addEventListener('click', saveScenario);
+
+
+// ---------- 이미지에서 불러오기 (OCR) ----------
+// Tesseract.js 로 브라우저 안에서 글자를 인식합니다 (이미지는 외부로 전송되지 않음).
+// 인식 엔진과 한글 학습 데이터는 처음 사용할 때 CDN 에서 한 번 내려받습니다.
+
+const TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+
+// OCR 원문 → 평가표 행 목록. 한 줄을 한 업체로 보고, 값의 모양으로 칸을 추정합니다.
+//  입찰금액: 콤마가 들어간 큰 수(1,234,567) 또는 7자리 이상 수
+//  참여업체: 4~6자리 정수            D-Safe점수: 입찰금액 앞의 20~100 사이 소수(79.6)
+//  업체수준: 상/중/하 한 글자          안전Hurdle: 입찰금액 앞쪽의 한 자리 정수(-1, 0, 1 …)
+//  업체명  : 나머지 한글/영문 글자
+function parseOcrText(text) {
+  const rows = [];
+  for (let line of String(text).split(/\r?\n/)) {
+    line = line
+      .replace(/[|｜¦\[\]{}_]/g, ' ')
+      .replace(/[—–−]/g, '-')
+      .replace(/최저가\s*업체/g, ' ')                         // 비고 열의 자동 표시는 업체명이 아님
+      .replace(/(\d)\s*([,.])\s+(?=\d{3}(?!\d))/g, '$1$2')   // "18, 500, 000" → "18,500,000"
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!line) continue;
+    if (/업체명|D-?\s?Safe|참여업체|입찰금액|입찰순위|계산\s?기준/i.test(line)) continue;  // 머리글
+
+    const tokens = line.split(' ');
+    const r = { code: '', name: '', level: '', dsafe: '', hurdle: '', bid: '' };
+    const kinds = tokens.map(() => '');
+
+    // 1) 입찰금액 (가장 큰 값)
+    let bidIdx = -1, bidVal = 0;
+    tokens.forEach((t, i) => {
+      const s = t.replace(/원$/, '');
+      if (/^\d{1,3}([,.]\d{3}){2,}$/.test(s) || /^\d{7,}$/.test(s)) {
+        const v = Number(s.replace(/\D/g, ''));
+        if (v > bidVal) { bidVal = v; bidIdx = i; }
+      }
+    });
+    if (bidIdx >= 0) { r.bid = String(bidVal); kinds[bidIdx] = 'bid'; }
+    const beforeBid = i => bidIdx < 0 || i < bidIdx;
+
+    tokens.forEach((t, i) => {
+      if (kinds[i]) return;
+      if (!r.code && /^\d{4,6}$/.test(t)) { r.code = t; kinds[i] = 'code'; return; }
+      if (!r.dsafe && beforeBid(i) && /^\d{2,3}[.,]\d{1,2}$/.test(t)) {
+        const v = parseFloat(t.replace(',', '.'));
+        if (v >= 20 && v <= 100) { r.dsafe = String(v); kinds[i] = 'dsafe'; return; }
+      }
+      if (!r.level && /^[상중하]$/.test(t)) { r.level = t; kinds[i] = 'level'; return; }
+    });
+
+    // 안전Hurdle: 입찰금액 앞의 마지막 한 자리 정수 (입찰금액이 없으면 첫 번째)
+    const hIdx = tokens.map((t, i) => i)
+      .filter(i => !kinds[i] && beforeBid(i) && /^[+-]?\d$/.test(tokens[i]));
+    if (hIdx.length) {
+      const i = bidIdx >= 0 ? hIdx[hIdx.length - 1] : hIdx[0];
+      r.hurdle = String(Number(tokens[i]));
+      kinds[i] = 'hurdle';
+    }
+
+    // 업체명: 남은 토큰 중 글자가 들어간 것
+    const nameTokens = tokens.filter((t, i) =>
+      !kinds[i] && /[가-힣A-Za-z㈜]/.test(t) && t !== '미참여' && t !== '-');
+    let name = nameTokens.join(' ').replace(/㈜/g, '(주)').trim();
+    // "가 나 건 설" 처럼 한 글자씩 띄어 인식된 경우 붙임
+    if (nameTokens.length > 1 && nameTokens.every(t => t.length <= 2)) name = name.replace(/\s+/g, '');
+    r.name = name;
+
+    const filled = ['code', 'name', 'dsafe', 'bid', 'level'].filter(k => r[k]).length;
+    if (filled >= 2 || (r.name && (r.bid || r.dsafe || r.code))) rows.push(r);
+  }
+  return rows;
+}
+
+let tesseractWorker = null;
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('인식 엔진을 내려받지 못했습니다 (인터넷 연결 확인)'));
+    document.head.appendChild(s);
+  });
+}
+
+async function getOcrWorker(onProgress) {
+  if (tesseractWorker) return tesseractWorker;
+  if (!window.Tesseract) await loadScript(TESSERACT_URL);
+  tesseractWorker = await Tesseract.createWorker('kor+eng', 1, {
+    logger: m => onProgress && onProgress(m),
+  });
+  await tesseractWorker.setParameters({
+    tessedit_pageseg_mode: '6',          // 표처럼 한 덩어리의 줄 단위 텍스트
+    preserve_interword_spaces: '1',
+  });
+  return tesseractWorker;
+}
+
+// 작은 캡처 이미지는 확대·흑백 처리하면 인식률이 좋아집니다.
+function prepareImage(img) {
+  const scale = Math.min(3, Math.max(1, 2000 / img.naturalWidth));
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.naturalWidth * scale);
+  c.height = Math.round(img.naturalHeight * scale);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, c.width, c.height);
+  const d = ctx.getImageData(0, 0, c.width, c.height);
+  const p = d.data;
+  for (let i = 0; i < p.length; i += 4) {
+    const g = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2];
+    p[i] = p[i + 1] = p[i + 2] = g;
+  }
+  ctx.putImageData(d, 0, 0);
+  return c;
+}
+
+const ocrModal = document.getElementById('ocr-modal');
+const ocrBody = document.getElementById('ocr-body');
+const ocrFile = document.getElementById('ocr-file');
+const ocrPreview = document.getElementById('ocr-preview');
+const ocrProgress = document.getElementById('ocr-progress');
+const ocrRaw = document.getElementById('ocr-raw');
+let ocrBusy = false;
+let ocrObjectUrl = null;
+
+function setOcrProgress(text, isError) {
+  ocrProgress.textContent = text;
+  ocrProgress.classList.toggle('error', !!isError);
+}
+
+function ocrEmptyRow() {
+  const tr = document.createElement('tr');
+  tr.className = 'ocr-empty';
+  tr.innerHTML = '<td colspan="7" class="empty">인식된 업체가 없습니다. 이미지가 선명한지 확인하거나 "+ 행 추가"로 직접 입력하세요.</td>';
+  return tr;
+}
+
+function createOcrRow(d = {}) {
+  ocrBody.querySelector('.ocr-empty')?.remove();
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input class="code-input" placeholder="코드"></td>
+    <td><input class="name-input" placeholder="업체명"></td>
+    <td><select class="level-input"><option value=""></option><option>상</option><option>중</option><option>하</option></select></td>
+    <td><input class="dsafe-input" type="number" step="0.1" min="0" max="100" placeholder="-"></td>
+    <td><input class="hurdle-input" type="number" step="1" placeholder="0"></td>
+    <td><input class="bid-input" placeholder="미참여"></td>
+    <td><button type="button" class="del-btn" title="이 행 제외">✕</button></td>`;
+  tr.querySelector('.code-input').value = d.code || '';
+  tr.querySelector('.name-input').value = d.name || '';
+  tr.querySelector('.level-input').value = d.level || '';
+  tr.querySelector('.dsafe-input').value = d.dsafe || '';
+  tr.querySelector('.hurdle-input').value = d.hurdle || '';
+  const bid = parseBid(d.bid);
+  tr.querySelector('.bid-input').value = bid !== null ? bid.toLocaleString() : '';
+  tr.querySelector('.del-btn').addEventListener('click', () => {
+    tr.remove();
+    if (!ocrBody.children.length) ocrBody.appendChild(ocrEmptyRow());
+  });
+  ocrBody.appendChild(tr);
+}
+
+function getOcrRows() {
+  return [...ocrBody.querySelectorAll('tr:not(.ocr-empty)')].map(tr => {
+    const bid = parseBid(tr.querySelector('.bid-input').value);
+    return {
+      code: tr.querySelector('.code-input').value.trim(),
+      name: tr.querySelector('.name-input').value.trim(),
+      level: tr.querySelector('.level-input').value,
+      dsafe: tr.querySelector('.dsafe-input').value,
+      hurdle: tr.querySelector('.hurdle-input').value,
+      bid: bid !== null ? String(bid) : '',
+    };
+  }).filter(r => r.code || r.name || r.dsafe || r.bid);
+}
+
+function closeOcrModal() {
+  ocrModal.hidden = true;
+  ocrFile.value = '';
+}
+
+async function runOcr(file) {
+  if (!file || !/^image\//.test(file.type)) {
+    alert('이미지 파일(png, jpg 등)을 선택하세요.');
+    return;
+  }
+  if (ocrBusy) return;
+  ocrBusy = true;
+  ocrModal.hidden = false;
+  ocrBody.innerHTML = '';
+  ocrRaw.textContent = '';
+  if (ocrObjectUrl) URL.revokeObjectURL(ocrObjectUrl);
+  ocrObjectUrl = URL.createObjectURL(file);
+  ocrPreview.src = ocrObjectUrl;
+  setOcrProgress('이미지 준비 중...');
+  try {
+    await ocrPreview.decode();
+    const canvas = prepareImage(ocrPreview);
+    const worker = await getOcrWorker(m => {
+      if (m.status === 'recognizing text') setOcrProgress(`글자 인식 중... ${Math.round(m.progress * 100)}%`);
+      else if (/load|initializ/i.test(m.status)) setOcrProgress('인식 엔진 준비 중... (처음 한 번은 시간이 걸립니다)');
+    });
+    setOcrProgress('글자 인식 중...');
+    const { data } = await worker.recognize(canvas);
+    ocrRaw.textContent = data.text;
+    const rows = parseOcrText(data.text);
+    rows.forEach(createOcrRow);
+    if (!rows.length) ocrBody.appendChild(ocrEmptyRow());
+    setOcrProgress(rows.length
+      ? `${rows.length}개 업체를 찾았습니다. 값을 확인·수정한 뒤 등록하세요.`
+      : '업체 데이터를 찾지 못했습니다.', !rows.length);
+  } catch (e) {
+    ocrBody.appendChild(ocrEmptyRow());
+    setOcrProgress('인식 실패 — ' + (e && e.message ? e.message : e), true);
+  } finally {
+    ocrBusy = false;
+  }
+}
+
+function applyOcrRows(replace) {
+  const rows = getOcrRows();
+  if (!rows.length) { alert('등록할 업체가 없습니다.'); return; }
+  if (replace) {
+    if (!confirm(`${whoseData()} 이미지에서 읽은 ${rows.length}개 업체로 바뀝니다. 계속할까요?`)) return;
+    renderRows(rows);
+  } else {
+    rows.forEach(d => tbody.appendChild(createRow(d)));
+    recalc();
+  }
+  scheduleSave();
+  closeOcrModal();
+  setStatus(`이미지에서 ${rows.length}개 업체 ${replace ? '불러옴' : '추가됨'}`, 'saved');
+}
+
+document.getElementById('ocr-btn').addEventListener('click', () => ocrFile.click());
+document.getElementById('ocr-pick').addEventListener('click', () => ocrFile.click());
+ocrFile.addEventListener('change', () => { if (ocrFile.files[0]) runOcr(ocrFile.files[0]); });
+document.getElementById('ocr-add-row').addEventListener('click', () => createOcrRow());
+document.getElementById('ocr-append').addEventListener('click', () => applyOcrRows(false));
+document.getElementById('ocr-replace').addEventListener('click', () => applyOcrRows(true));
+ocrModal.querySelectorAll('[data-ocr-cancel]').forEach(b => b.addEventListener('click', closeOcrModal));
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !ocrModal.hidden) closeOcrModal(); });
+
+// 캡처한 이미지를 Ctrl+V 로 붙여넣거나, 이미지 파일을 화면에 끌어다 놓아도 됩니다.
+function imageFromList(items) {
+  for (const it of items || []) {
+    const f = it.kind === 'file' ? it.getAsFile() : it;
+    if (f && /^image\//.test(f.type)) return f;
+  }
+  return null;
+}
+
+document.addEventListener('paste', e => {
+  if (document.body.classList.contains('locked')) return;
+  const f = imageFromList(e.clipboardData && e.clipboardData.items);
+  if (f) { e.preventDefault(); runOcr(f); }
+});
+document.addEventListener('dragover', e => {
+  if ([...(e.dataTransfer?.types || [])].includes('Files')) e.preventDefault();
+});
+document.addEventListener('drop', e => {
+  if (document.body.classList.contains('locked')) return;
+  const f = imageFromList(e.dataTransfer && e.dataTransfer.files);
+  if (f) { e.preventDefault(); runOcr(f); }
+});
 
 init();

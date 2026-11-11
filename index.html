@@ -25,6 +25,8 @@
   <div class="toolbar">
     <button id="add-row-btn" class="btn btn-primary">+ 업체 추가</button>
     <button id="save-scenario-btn" class="btn btn-save">💾 현재 상태 저장</button>
+    <button id="ocr-btn" class="btn btn-ocr" title="표 이미지(캡처·사진)에서 업체 데이터를 읽어옵니다. Ctrl+V 로 붙여넣기도 됩니다.">🖼 이미지에서 불러오기</button>
+    <input id="ocr-file" type="file" accept="image/*" hidden>
     <span id="sample-buttons"></span>
     <span id="sync-status" class="sync-status"></span>
   </div>
@@ -45,6 +47,8 @@
           <th>안전보건점수</th>
           <th>종합평가결과</th>
           <th>입찰순위</th>
+          <th>D-safe<br>자동계산점수</th>
+          <th>비고</th>
           <th></th>
         </tr>
       </thead>
@@ -69,6 +73,8 @@
       <li><b>가격점수</b> = 80 × 최저 입찰액 ÷ 해당업체 입찰액</li>
       <li><b>안전보건점수</b> = 20 × ( D-Safe점수 ÷ 100 ) + 안전Hurdle점수</li>
       <li><b>종합평가결과</b> = 가격점수 + 안전보건점수 → 높은 순으로 <b>입찰순위</b> 부여</li>
+      <li><b>D-safe 자동계산점수</b> : D-Safe점수를 입력하지 않아 업체수준으로 자동 계산된 경우 그 점수를 표시</li>
+      <li><b>비고</b> : 자유롭게 입력 가능, 최저 입찰금액 업체에는 <b>최저가 업체</b>가 자동 표시</li>
     </ul>
   </section>
 
@@ -77,6 +83,43 @@
     <p>내 IP : <b id="my-ip">-</b></p>
     <p>현재 접속자 (<span id="client-count">0</span>명) : <span id="client-list">-</span></p>
   </footer>
+</div>
+
+<div id="ocr-modal" class="modal" hidden>
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>이미지에서 데이터 불러오기</h2>
+      <button type="button" class="modal-close" data-ocr-cancel title="닫기">✕</button>
+    </div>
+    <p class="modal-sub">표 이미지를 글자 인식(OCR)해서 업체 데이터를 만듭니다. 이미지는 이 브라우저 안에서만 처리되며 외부로 전송되지 않습니다.
+      인식 결과는 틀릴 수 있으니 아래 표에서 확인·수정한 뒤 등록하세요.</p>
+    <div class="ocr-top">
+      <img id="ocr-preview" alt="불러온 이미지">
+      <div class="ocr-side">
+        <button type="button" id="ocr-pick" class="btn">다른 이미지 선택</button>
+        <div id="ocr-progress" class="ocr-progress"></div>
+        <details>
+          <summary>인식된 원문 보기</summary>
+          <pre id="ocr-raw"></pre>
+        </details>
+      </div>
+    </div>
+    <div class="table-wrap ocr-table-wrap">
+      <table class="ocr-table">
+        <thead>
+          <tr><th>참여업체</th><th>업체명</th><th>업체수준</th><th>D-Safe점수</th><th>안전Hurdle</th><th>입찰금액</th><th></th></tr>
+        </thead>
+        <tbody id="ocr-body"></tbody>
+      </table>
+    </div>
+    <div class="modal-foot">
+      <button type="button" id="ocr-add-row" class="btn btn-ghost">+ 행 추가</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn" data-ocr-cancel>취소</button>
+      <button type="button" id="ocr-append" class="btn btn-primary">기존 표에 추가</button>
+      <button type="button" id="ocr-replace" class="btn btn-save">표 전체 교체</button>
+    </div>
+  </div>
 </div>
 <script src="app.js"></script>
 </body>

@@ -52,7 +52,7 @@ function saveScenarios() {
   fs.writeFileSync(SCEN_FILE, JSON.stringify(scenarios, null, 1), 'utf8');
 }
 
-// 평가표 행을 알려진 6개 항목만 남기고 정리 (엉뚱한 데이터 저장 방지)
+// 평가표 행을 알려진 항목만 남기고 정리 (엉뚱한 데이터 저장 방지)
 function cleanRows(rows) {
   if (!Array.isArray(rows) || rows.length > MAX_ROWS) return null;
   return rows.map(r => {
@@ -65,6 +65,7 @@ function cleanRows(rows) {
       dsafe: s(o.dsafe, 20),
       hurdle: s(o.hurdle, 20),
       bid: s(o.bid, 30),
+      note: s(o.note, 200),
     };
   });
 }
