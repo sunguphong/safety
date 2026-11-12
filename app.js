@@ -464,7 +464,10 @@ let savedSignature = '';
 let renderSeq = 0;
 
 // 버튼 목록을 한 번에 다시 그림 (지우기와 그리기 사이에 await 이 없어야 중복이 안 생김)
+let scenarioItems = [];   // 저장 창에서 덮어쓸 대상 목록으로 사용
+
 function renderScenarioButtons(items) {
+  scenarioItems = items;
   sampleBox.innerHTML = '';
   SAMPLES.forEach(s => sampleBox.appendChild(makeSampleBtn(s)));
   items.forEach(it => sampleBox.appendChild(makeSavedBtn(it)));
@@ -497,14 +500,73 @@ function defaultScenarioName() {
   return `시뮬레이션 (${n.getMonth() + 1}/${n.getDate()})`;
 }
 
-async function saveScenario() {
-  const name = (prompt('저장할 이름을 입력하세요', defaultScenarioName()) || '').trim();
-  if (!name) return;
+// ----- 저장 창: 새 이름으로 저장하거나 기존 저장본을 골라 덮어쓰기 -----
+const saveModal = document.getElementById('save-modal');
+const saveList = document.getElementById('save-list');
+const saveNewName = document.getElementById('save-new-name');
+const saveNewRadio = document.getElementById('save-new-radio');
 
-  const dup = [...sampleBox.querySelectorAll('.btn-saved')]
-    .some(b => b.textContent === name + ' 불러오기');
-  if (dup && !confirm(`"${name}" 이(가) 이미 있습니다. 덮어쓸까요?`)) return;
+function openSaveModal() {
+  saveList.innerHTML = '';
+  if (!scenarioItems.length) {
+    saveList.innerHTML = '<p class="save-empty">아직 저장된 시뮬레이션이 없습니다.</p>';
+  }
+  scenarioItems
+    .slice()
+    .sort((a, b) => String(b.savedAt).localeCompare(String(a.savedAt)))   // 최근 저장 순
+    .forEach(it => {
+      const label = document.createElement('label');
+      label.className = 'save-opt';
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'save-target';
+      radio.value = it.name;
+      const nm = document.createElement('span');
+      nm.className = 'save-name';
+      nm.textContent = it.name;
+      const time = document.createElement('span');
+      time.className = 'save-time';
+      time.textContent = it.savedAt ? new Date(it.savedAt).toLocaleString('ko-KR') : '';
+      label.append(radio, nm, time);
+      saveList.appendChild(label);
+    });
+  saveNewRadio.checked = true;
+  saveNewName.value = defaultScenarioName();
+  saveModal.hidden = false;
+  saveNewName.focus();
+  saveNewName.select();
+}
 
+function closeSaveModal() { saveModal.hidden = true; }
+
+async function confirmSaveModal() {
+  const picked = saveModal.querySelector('input[name="save-target"]:checked');
+  let name;
+  if (!picked || picked === saveNewRadio) {
+    name = saveNewName.value.trim();
+    if (!name) { alert('저장할 이름을 입력하세요.'); saveNewName.focus(); return; }
+    if (scenarioItems.some(it => it.name === name) &&
+        !confirm(`"${name}" 이(가) 이미 있습니다. 덮어쓸까요?`)) return;
+  } else {
+    name = picked.value;
+    if (!confirm(`저장본 "${name}" 을(를) 현재 표 내용으로 덮어쓸까요?`)) return;
+  }
+  closeSaveModal();
+  await writeScenario(name);
+}
+
+saveNewName.addEventListener('focus', () => { saveNewRadio.checked = true; });
+saveNewName.addEventListener('keydown', e => { if (e.key === 'Enter') confirmSaveModal(); });
+document.getElementById('save-confirm').addEventListener('click', confirmSaveModal);
+saveModal.querySelectorAll('[data-save-cancel]').forEach(b => b.addEventListener('click', closeSaveModal));
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !saveModal.hidden) closeSaveModal(); });
+
+function saveScenario() {
+  openSaveModal();
+}
+
+// 같은 이름이 있으면 덮어쓰고, 없으면 새로 만듭니다 (서버도 같은 규칙).
+async function writeScenario(name) {
   if (!online) {
     const items = lsGet(LS_SCEN, []);
     const savedAt = new Date().toISOString();
