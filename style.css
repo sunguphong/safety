@@ -7,7 +7,7 @@ body {
   padding: 24px;
 }
 
-.container { max-width: 1280px; margin: 0 auto; }
+.container { max-width: 1600px; margin: 0 auto; }
 
 /* 접속 비밀번호 (브라우저 저장 모드) — 확인 전에는 평가표를 숨김 */
 body.locked .container { display: none; }
@@ -103,7 +103,7 @@ table { border-collapse: collapse; width: 100%; min-width: 1100px; }
 
 th, td {
   border: 1px solid #999;
-  padding: 6px 8px;
+  padding: 5px 6px;
   text-align: center;
   font-size: 13px;
   white-space: nowrap;
@@ -129,7 +129,7 @@ td input:hover, td select:hover { border-color: #bbb; }
 td input:focus, td select:focus { border-color: #2b6cb0; outline: none; background: #fff; }
 
 td input.name-input { text-align: left; min-width: 150px; }
-td input.bid-input { text-align: right; min-width: 110px; }
+td input.bid-input { text-align: right; min-width: 100px; }
 
 td.calc { background: #fafafa; }
 
@@ -229,16 +229,16 @@ td.absent-label { color: #333; font-weight: 700; }
 .modal-foot .spacer { flex: 1; }
 
 /* D-safe 자동계산점수 / 비고 */
-td.note-cell { min-width: 230px; text-align: left; }
-td.note-cell input.note-input { text-align: left; min-width: 120px; }
+td.note-cell { min-width: 140px; text-align: left; }
+td.note-cell input.note-input { text-align: left; min-width: 100px; }
 .lowest-tag {
-  display: inline-block; margin-bottom: 2px;
+  display: block; width: fit-content; margin-bottom: 2px;
   font-size: 11px; font-weight: 700; color: #d40000;
   background: #fff0f0; border: 1px solid #f3b4b4; border-radius: 10px; padding: 1px 8px;
 }
 .lowest-tag[hidden] { display: none; }
 .best-tag {
-  display: inline-block; margin: 0 4px 2px 0;
+  display: block; width: fit-content; margin-bottom: 2px;
   font-size: 11px; font-weight: 800; color: #fff;
   background: #d40000; border-radius: 10px; padding: 1px 8px;
 }
