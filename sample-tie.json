@@ -1,0 +1,10 @@
+{
+  "label": "동점 예시",
+  "rows": [
+    { "code": "900011", "name": "가람건설(주)",     "level": "",   "dsafe": "70.0", "hurdle": "0",  "bid": "18000000", "note": "" },
+    { "code": "900012", "name": "(주)나래산업",     "level": "",   "dsafe": "80.9", "hurdle": "0",  "bid": "18500000", "note": "" },
+    { "code": "900013", "name": "(주)다온테크",     "level": "",   "dsafe": "72.0", "hurdle": "0",  "bid": "18200000", "note": "" },
+    { "code": "900014", "name": "라온엔지니어링",   "level": "중", "dsafe": "",     "hurdle": "-1", "bid": "18300000", "note": "" },
+    { "code": "900015", "name": "(주)마루플랜트",   "level": "",   "dsafe": "78.5", "hurdle": "1",  "bid": "",         "note": "" }
+  ]
+}
