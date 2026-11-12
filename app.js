@@ -101,7 +101,7 @@ function createRow(data = {}) {
     <td class="calc total-cell"></td>
     <td class="calc rank-cell"></td>
     <td class="calc autodsafe-cell"></td>
-    <td class="note-cell"><span class="best-tag" hidden>★최적입찰선정업체</span><span class="lowest-tag" hidden>최저가 업체</span><input class="note-input" value="${escAttr(data.note)}"></td>
+    <td class="note-cell"><span class="best-tag" hidden>★최적입찰선정업체</span><span class="lowest-tag" hidden>최저가 업체</span><span class="tie-tag" hidden>종평 동점</span><input class="note-input" value="${escAttr(data.note)}"></td>
     <td><button class="del-btn" title="행 삭제">✕</button></td>
   `;
   tr.querySelector('.level-input').value = data.level || '';
@@ -204,6 +204,11 @@ function recalc() {
     .slice().sort((a, b) => (round1(b.total) - round1(a.total)) || (b.price - a.price));
   ranked.forEach((r, i) => { r.rank = i + 1; });
 
+  // 종합평가결과 동점(소수 첫째 자리 기준) 업체 표시
+  const totalCount = new Map();
+  ranked.forEach(r => totalCount.set(round1(r.total), (totalCount.get(round1(r.total)) || 0) + 1));
+  ranked.forEach(r => { r.tie = totalCount.get(round1(r.total)) > 1; });
+
   rows.forEach(r => {
     const tr = r.tr;
     const absent = r.bid === null;
@@ -228,6 +233,7 @@ function recalc() {
     bidTd.classList.toggle('lowest-bid', isLowest);
     tr.querySelector('.lowest-tag').hidden = !isLowest;
     tr.querySelector('.best-tag').hidden = r.rank !== 1;   // 입찰순위 1위
+    tr.querySelector('.tie-tag').hidden = !r.tie;
     bidTd.classList.toggle('absent-label', absent);
     tr.querySelector('.bid-input').placeholder = '미참여';
 
@@ -625,7 +631,7 @@ function parseOcrText(text) {
     line = line
       .replace(/[|｜¦\[\]{}_]/g, ' ')
       .replace(/[—–−]/g, '-')
-      .replace(/★?\s*최적입찰선정업체|최저가\s*업체/g, ' ')                         // 비고 열의 자동 표시는 업체명이 아님
+      .replace(/★?\s*최적입찰선정업체|최저가\s*업체|종평\s*동점/g, ' ')                         // 비고 열의 자동 표시는 업체명이 아님
       .replace(/(\d)\s*([,.])\s+(?=\d{3}(?!\d))/g, '$1$2')   // "18, 500, 000" → "18,500,000"
       .replace(/\s+/g, ' ')
       .trim();
