@@ -100,7 +100,7 @@ function createRow(data = {}) {
     <td class="calc total-cell"></td>
     <td class="calc rank-cell"></td>
     <td class="calc autodsafe-cell"></td>
-    <td class="note-cell"><span class="lowest-tag" hidden>최저가 업체</span><input class="note-input" value="${escAttr(data.note)}"></td>
+    <td class="note-cell"><span class="best-tag" hidden>★최적입찰선정업체</span><span class="lowest-tag" hidden>최저가 업체</span><input class="note-input" value="${escAttr(data.note)}"></td>
     <td><button class="del-btn" title="행 삭제">✕</button></td>
   `;
   tr.querySelector('.level-input').value = data.level || '';
@@ -225,6 +225,7 @@ function recalc() {
     const isLowest = !absent && r.bid === lowestBid && participants.length > 1;
     bidTd.classList.toggle('lowest-bid', isLowest);
     tr.querySelector('.lowest-tag').hidden = !isLowest;
+    tr.querySelector('.best-tag').hidden = r.rank !== 1;   // 입찰순위 1위
     bidTd.classList.toggle('absent-label', absent);
     tr.querySelector('.bid-input').placeholder = '미참여';
 
@@ -560,7 +561,7 @@ function parseOcrText(text) {
     line = line
       .replace(/[|｜¦\[\]{}_]/g, ' ')
       .replace(/[—–−]/g, '-')
-      .replace(/최저가\s*업체/g, ' ')                         // 비고 열의 자동 표시는 업체명이 아님
+      .replace(/★?\s*최적입찰선정업체|최저가\s*업체/g, ' ')                         // 비고 열의 자동 표시는 업체명이 아님
       .replace(/(\d)\s*([,.])\s+(?=\d{3}(?!\d))/g, '$1$2')   // "18, 500, 000" → "18,500,000"
       .replace(/\s+/g, ' ')
       .trim();

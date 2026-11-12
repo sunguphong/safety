@@ -229,7 +229,7 @@ td.absent-label { color: #333; font-weight: 700; }
 .modal-foot .spacer { flex: 1; }
 
 /* D-safe 자동계산점수 / 비고 */
-td.note-cell { min-width: 170px; text-align: left; }
+td.note-cell { min-width: 230px; text-align: left; }
 td.note-cell input.note-input { text-align: left; min-width: 120px; }
 .lowest-tag {
   display: inline-block; margin-bottom: 2px;
@@ -237,3 +237,9 @@ td.note-cell input.note-input { text-align: left; min-width: 120px; }
   background: #fff0f0; border: 1px solid #f3b4b4; border-radius: 10px; padding: 1px 8px;
 }
 .lowest-tag[hidden] { display: none; }
+.best-tag {
+  display: inline-block; margin: 0 4px 2px 0;
+  font-size: 11px; font-weight: 800; color: #fff;
+  background: #d40000; border-radius: 10px; padding: 1px 8px;
+}
+.best-tag[hidden] { display: none; }
