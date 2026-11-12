@@ -173,6 +173,7 @@ function recalc() {
       if (r.level === '상') r.dsafe = Math.max(...pool);
       else if (r.level === '하') r.dsafe = Math.min(...pool);
       else r.dsafe = pool.reduce((a, b) => a + b, 0) / pool.length;
+      r.dsafe = Math.round(r.dsafe * 10) / 10;   // 자동 계산 점수는 소수 첫째 자리 반올림 후 이후 계산에 사용
     } else {
       r.dsafe = null;
     }
