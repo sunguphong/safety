@@ -269,3 +269,8 @@ td.note-cell input.note-input { text-align: left; min-width: 100px; }
   background: #fffbea; border: 1px solid #f0d58c; border-radius: 10px; padding: 1px 8px;
 }
 .tie-tag[hidden] { display: none; }
+
+/* 저장본 내보내기 */
+.save-opt input[type=checkbox] { width: 15px; height: 15px; }
+.save-opt:has(input[type=checkbox]:checked) { border-color: #2b6cb0; background: #f3f8fd; }
+.export-all-opt { background: #fafafa; }

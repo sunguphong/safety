@@ -573,37 +573,37 @@ function saveScenario() {
   openSaveModal();
 }
 
-// 같은 이름이 있으면 덮어쓰고, 없으면 새로 만듭니다 (서버도 같은 규칙).
-async function writeScenario(name) {
+// 저장본 하나를 기록합니다. 같은 이름이 있으면 덮어쓰고, 없으면 새로 만듭니다 (서버도 같은 규칙).
+// 실패하면 예외를 던집니다.
+async function storeScenario(name, rows) {
   if (!online) {
     const items = lsGet(LS_SCEN, []);
     const savedAt = new Date().toISOString();
     const existing = items.find(it => it.name === name);
     if (existing) {
-      existing.rows = getRowsData();
+      existing.rows = rows;
       existing.savedAt = savedAt;
     } else {
-      items.push({ id: Date.now().toString(36), name, savedAt, rows: getRowsData() });
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      items.push({ id, name, savedAt, rows });
     }
-    if (!lsSet(LS_SCEN, items)) {
-      setStatus('시뮬레이션 저장 실패 — 브라우저 저장소를 사용할 수 없습니다', 'error');
-      return;
-    }
-    await refreshScenarios();
-    setStatus(`"${name}" 저장됨`, 'saved');
+    if (!lsSet(LS_SCEN, items)) throw new Error('브라우저 저장소를 사용할 수 없습니다');
     return;
   }
+  const res = await fetch('/api/scenarios', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, rows }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error === 'too many' ? '저장본이 너무 많습니다 (최대 100개)' : (err.error || res.status));
+  }
+}
 
+async function writeScenario(name) {
   try {
-    const res = await fetch('/api/scenarios', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, rows: getRowsData() }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || res.status);
-    }
+    await storeScenario(name, getRowsData());
     await refreshScenarios();
     setStatus(`"${name}" 저장됨`, 'saved');
   } catch (e) {
@@ -612,6 +612,179 @@ async function writeScenario(name) {
 }
 
 document.getElementById('save-scenario-btn').addEventListener('click', saveScenario);
+
+// ---------- 저장본 내보내기 / 파일에서 불러오기 ----------
+// 내보낸 파일(.json)을 다른 PC·브라우저에서 "파일에서 불러오기"로 저장본 목록에 등록할 수 있습니다.
+
+const EXPORT_TYPE = 'safety-scenarios';
+const exportModal = document.getElementById('export-modal');
+const exportList = document.getElementById('export-list');
+const exportAll = document.getElementById('export-all');
+const importFile = document.getElementById('import-file');
+
+async function fetchScenarioRows(item) {
+  if (!online) {
+    const d = lsGet(LS_SCEN, []).find(it => it.id === item.id);
+    if (!d) throw new Error('저장본을 찾을 수 없습니다');
+    return d.rows;
+  }
+  const res = await fetch('/api/scenarios/' + item.id);
+  if (!res.ok) throw new Error(res.status);
+  return (await res.json()).rows;
+}
+
+function openExportModal() {
+  exportList.innerHTML = '';
+  if (!scenarioItems.length) {
+    exportList.innerHTML = '<p class="save-empty">내보낼 저장본이 없습니다. 먼저 "현재 상태 저장"으로 저장하세요.</p>';
+  }
+  scenarioItems
+    .slice()
+    .sort((a, b) => String(b.savedAt).localeCompare(String(a.savedAt)))
+    .forEach(it => {
+      const label = document.createElement('label');
+      label.className = 'save-opt';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = it.id;
+      cb.addEventListener('change', syncExportAll);
+      const nm = document.createElement('span');
+      nm.className = 'save-name';
+      nm.textContent = it.name;
+      const time = document.createElement('span');
+      time.className = 'save-time';
+      time.textContent = it.savedAt ? new Date(it.savedAt).toLocaleString('ko-KR') : '';
+      label.append(cb, nm, time);
+      exportList.appendChild(label);
+    });
+  exportAll.checked = false;
+  exportAll.disabled = !scenarioItems.length;
+  exportModal.hidden = false;
+}
+
+function exportChecks() { return [...exportList.querySelectorAll('input[type=checkbox]')]; }
+
+function syncExportAll() {
+  const cbs = exportChecks();
+  exportAll.checked = cbs.length > 0 && cbs.every(c => c.checked);
+}
+
+exportAll.addEventListener('change', () => exportChecks().forEach(c => { c.checked = exportAll.checked; }));
+
+function closeExportModal() { exportModal.hidden = true; }
+
+function safeFileName(s) {
+  return String(s).replace(/[\\/:*?"<>|]+/g, '_').trim().slice(0, 60) || '저장본';
+}
+
+function downloadJson(data, fileName) {
+  const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function confirmExport() {
+  const ids = exportChecks().filter(c => c.checked).map(c => c.value);
+  if (!ids.length) { alert('내보낼 저장본을 선택하세요.'); return; }
+  const picked = scenarioItems.filter(it => ids.includes(it.id));
+  try {
+    const items = [];
+    for (const it of picked) {
+      items.push({ name: it.name, savedAt: it.savedAt, rows: await fetchScenarioRows(it) });
+    }
+    const n = new Date();
+    const ymd = `${n.getFullYear()}${String(n.getMonth() + 1).padStart(2, '0')}${String(n.getDate()).padStart(2, '0')}`;
+    const fileName = items.length === 1
+      ? `안전보건평가_${safeFileName(items[0].name)}.json`
+      : `안전보건평가_저장본${items.length}개_${ymd}.json`;
+    downloadJson({ type: EXPORT_TYPE, version: 1, exportedAt: n.toISOString(), items }, fileName);
+    closeExportModal();
+    setStatus(`저장본 ${items.length}개 내보냄`, 'saved');
+  } catch (e) {
+    setStatus('내보내기 실패 — ' + e.message, 'error');
+  }
+}
+
+// 파일 내용 → [{ name, rows }]. 내보낸 파일과 예시 데이터 형식({ label, rows }) 모두 받습니다.
+function parseImportData(d, fileName) {
+  const base = String(fileName || '불러온 데이터').replace(/\.json$/i, '');
+  if (d && d.type === EXPORT_TYPE && Array.isArray(d.items)) {
+    return d.items
+      .filter(it => it && Array.isArray(it.rows))
+      .map((it, i) => ({ name: String(it.name || `${base} ${i + 1}`).trim().slice(0, 60), rows: it.rows }));
+  }
+  if (d && Array.isArray(d.rows)) return [{ name: String(d.name || d.label || base).trim().slice(0, 60), rows: d.rows }];
+  if (Array.isArray(d)) return [{ name: base.slice(0, 60), rows: d }];
+  return [];
+}
+
+// 이름 충돌 시 "이름 (2)" 처럼 비어 있는 이름을 찾습니다.
+function uniqueName(name, taken) {
+  if (!taken.has(name)) return name;
+  for (let i = 2; ; i++) {
+    const cand = `${name.slice(0, 54)} (${i})`;
+    if (!taken.has(cand)) return cand;
+  }
+}
+
+async function importScenarios(file) {
+  let list;
+  try {
+    list = parseImportData(JSON.parse(await file.text()), file.name);
+  } catch (e) {
+    alert('파일을 읽지 못했습니다. 이 평가표에서 내보낸 .json 파일인지 확인하세요.');
+    return;
+  }
+  if (!list.length) { alert('불러올 저장본이 파일에 없습니다.'); return; }
+
+  const taken = new Set(scenarioItems.map(it => it.name));
+  const dups = list.filter(it => taken.has(it.name)).map(it => it.name);
+  let overwrite = false;
+  if (dups.length) {
+    overwrite = confirm(
+      `같은 이름의 저장본이 ${dups.length}개 있습니다: ${dups.slice(0, 5).join(', ')}${dups.length > 5 ? ' …' : ''}\n\n` +
+      '[확인] 기존 저장본을 덮어씁니다.\n[취소] 이름 뒤에 번호를 붙여 따로 저장합니다.');
+  } else if (!confirm(`저장본 ${list.length}개(${list.slice(0, 3).map(it => it.name).join(', ')}${list.length > 3 ? ' …' : ''})를 목록에 등록할까요?`)) {
+    return;
+  }
+
+  let ok = 0;
+  const failed = [];
+  for (const it of list) {
+    const name = overwrite ? it.name : uniqueName(it.name, taken);
+    taken.add(name);
+    try {
+      await storeScenario(name, it.rows);
+      ok++;
+    } catch (e) {
+      failed.push(`${name} (${e.message})`);
+    }
+  }
+  await refreshScenarios();
+  if (failed.length) {
+    setStatus(`저장본 ${ok}개 등록, ${failed.length}개 실패`, 'error');
+    alert('등록하지 못한 저장본:\n' + failed.join('\n'));
+  } else {
+    setStatus(`파일에서 저장본 ${ok}개 등록됨 — 목록의 "불러오기" 버튼으로 표에 반영하세요`, 'saved');
+  }
+}
+
+document.getElementById('export-btn').addEventListener('click', openExportModal);
+document.getElementById('export-confirm').addEventListener('click', confirmExport);
+exportModal.querySelectorAll('[data-export-cancel]').forEach(b => b.addEventListener('click', closeExportModal));
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !exportModal.hidden) closeExportModal(); });
+document.getElementById('import-btn').addEventListener('click', () => importFile.click());
+importFile.addEventListener('change', async () => {
+  const f = importFile.files[0];
+  importFile.value = '';
+  if (f) await importScenarios(f);
+});
 
 
 // ---------- 이미지에서 불러오기 (OCR) ----------
