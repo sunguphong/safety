@@ -197,9 +197,10 @@ function recalc() {
     }
   });
 
-  // 순위: 참여업체만, 종합평가결과 내림차순
+  // 순위: 참여업체만, 종합평가결과 내림차순 → 동점(화면 표시 기준 소수 첫째 자리)이면 가격점수 높은 순
+  const round1 = n => Math.round(n * 10) / 10;
   const ranked = participants.filter(r => r.total !== null)
-    .slice().sort((a, b) => b.total - a.total);
+    .slice().sort((a, b) => (round1(b.total) - round1(a.total)) || (b.price - a.price));
   ranked.forEach((r, i) => { r.rank = i + 1; });
 
   rows.forEach(r => {
